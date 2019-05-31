@@ -57,7 +57,8 @@ Command c = new Command(2, new MyCommands()); // 2 is the number of context para
 {
 }
 ...
-c.execute(myUser, mySession, "sayHello Foobar");
+c.execute("sayHello Foobar", myUser, mySession);
 ```
 
 You can customize other stuff, like how to convert from String to your custom objects, how to tokenize the strings, etc.
+More advanced example is available [here](https://github.com/msx80/annocommand/tree/master/src/main/java/org/github/msx80/annocommand/example/account).
