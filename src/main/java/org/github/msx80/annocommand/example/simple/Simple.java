@@ -24,7 +24,7 @@ public class Simple {
 		
 		Command c = new Command(0, new Simple());
 		
-		c.execute("hello Johnny");
+		c.execute("hello Johnny Cash");
 		c.execute("sum 4 5");
 		
 		System.out.println(c.execute("uppercase sometext"));

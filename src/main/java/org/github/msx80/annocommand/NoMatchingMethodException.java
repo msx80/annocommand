@@ -5,20 +5,26 @@ public class NoMatchingMethodException extends AnnoCommandException {
 
 	private static final long serialVersionUID = -937989977705688411L;
 
-	public NoMatchingMethodException() {
+	public final String baseCommand;
+	
+	public NoMatchingMethodException(String baseCommand) {
 		super();
+		this.baseCommand = baseCommand;
 	}
 
-	public NoMatchingMethodException(Exception cause) {
+	public NoMatchingMethodException(String baseCommand,Exception cause) {
 		super(cause);
+		this.baseCommand = baseCommand;
 	}
 
-	public NoMatchingMethodException(String message, Exception cause) {
+	public NoMatchingMethodException(String baseCommand, String message, Exception cause) {
 		super(message, cause);
+		this.baseCommand = baseCommand;
 	}
 
-	public NoMatchingMethodException(String message) {
+	public NoMatchingMethodException(String baseCommand, String message) {
 		super(message);
+		this.baseCommand = baseCommand;
 	}
 
 }

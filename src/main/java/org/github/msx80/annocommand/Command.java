@@ -173,7 +173,7 @@ public class Command {
 				
 			}
 		}
-		throw new NoMatchingMethodException("No method matching request.");
+		throw new NoMatchingMethodException(tok[0], "No method matching request.");
 		
 	}
 	
@@ -183,7 +183,26 @@ public class Command {
 	 */
 	public List<String> availableCommands()
 	{
-		return calls.stream().map( c -> c.getCallString()).collect(Collectors.toList());
+		return calls
+				.stream()
+				.map( c -> c.getCallString())
+				.sorted()
+				.collect(Collectors.toList());
+	}
+	
+	/**
+	 * List all available versions of a given command
+	 * @param baseCommand the command to list
+	 * @return a list of all commands with parameters.
+	 */
+	public List<String> availableCommands(String baseCommand)
+	{
+		return calls
+				.stream()
+				.filter(c -> c.cmd.equals(baseCommand))
+				.map( c -> c.getCallString())
+				.sorted()
+				.collect(Collectors.toList());
 	}
 	
 	
