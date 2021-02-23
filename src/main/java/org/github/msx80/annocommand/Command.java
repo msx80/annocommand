@@ -163,7 +163,7 @@ public class Command {
 		
 		String text = preparer.apply(m, context);
 		if(text == null) return null;
-		String[] tok = tokenizer.apply(m, context);
+		String[] tok = tokenizer.apply(text, context);
 		
 		for (CallSpec callSpec : calls) {
 			if(callSpec.match(tok))
