@@ -1,3 +1,4 @@
+[![Release](https://jitpack.io/v/msx80/annocommand.svg)](https://jitpack.io/#msx80/annocommand)
 # annocommand
 Annotation based text command parser
 

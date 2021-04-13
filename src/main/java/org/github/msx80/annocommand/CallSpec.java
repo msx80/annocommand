@@ -7,11 +7,11 @@ import java.util.stream.Stream;
 
 class CallSpec {
 	
-	protected String cmd;
-	protected int numParam;
-	protected Parameter[] params;
-	protected Method method;
-	protected Object objectToCall;
+	public final String cmd;
+	public final int numParam;
+	protected final Parameter[] params;
+	protected final Method method;
+	protected final Object objectToCall;
 
 	
 	public CallSpec(Method m, Object objectToCall, int numContextParams) {
