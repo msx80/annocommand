@@ -18,7 +18,7 @@ public class ExampleMain {
 		ExampleCommands cmds = new ExampleCommands();
 		
 		// 2 is the number of passed parameters. This have to appear as the first two parameters of every @Cmd method
-		Command c = new Command(2, cmds );
+		Command c = new Command(2, false, cmds );
 		
 		// set up a processor for incoming commands
 		c.setMessagePreparer(ExampleMain::prepare);  

@@ -45,15 +45,16 @@ public class Command {
 	private BiFunction<String, Object[], String> preparer = (text, context) -> text;
 	private BiFunction<String, Object[], String[]> tokenizer = (text, context) -> text.split(" +");
 	private int numContextParameters;
-	
+	private boolean ignoreCase;
+
 	/**
 	 * Create a new Command to parse text commands, that will be sent the first matching method of the provided objects
 	 * @param numContextParameters number of extra parameters depending on context, handled outside of the string (like session or user identifiers)
 	 * @param objectsWithCommands the actual objects whose methods will be called
 	 */
-	public Command(int numContextParameters, Object... objectsWithCommands) {
+	public Command(int numContextParameters, boolean ignoreCase, Object... objectsWithCommands) {
 		
-
+		this.ignoreCase = ignoreCase;
 		this.numContextParameters = numContextParameters;
 		for (Object object : objectsWithCommands) 
 		{
@@ -90,7 +91,7 @@ public class Command {
 		for (Method m : ms) {
 			if(m.isAnnotationPresent(Cmd.class))
 			{
-				CallSpec c = new CallSpec(m, objectWithCommands, numContextParameters);
+				CallSpec c = new CallSpec(m, objectWithCommands, numContextParameters, ignoreCase);
 				calls.add(c);
 			}
 		}

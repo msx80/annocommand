@@ -12,13 +12,14 @@ class CallSpec {
 	protected final Parameter[] params;
 	protected final Method method;
 	protected final Object objectToCall;
-
+	private boolean ignoreCase;
 	
-	public CallSpec(Method m, Object objectToCall, int numContextParams) {
+	public CallSpec(Method m, Object objectToCall, int numContextParams, boolean ignoreCase) {
 		this.cmd = m.getName();
 		this.objectToCall = objectToCall;
 		this.numParam = m.getParameterCount() -numContextParams; 
 		this.method = m;
+		this.ignoreCase = ignoreCase;
 
 		if(numParam<0) throw new AnnoCommandException("Less parameter than the number of context parameter for "+this);
 		
@@ -31,8 +32,14 @@ class CallSpec {
 
 	public boolean match(String[] text)
 	{
-		if(!cmd.equals(text[0])) return false;
-		
+		if(ignoreCase)
+		{
+			if(!cmd.equalsIgnoreCase(text[0])) return false;
+		}
+		else
+		{
+			if(!cmd.equals(text[0])) return false;
+		}
 		int numPar = text.length-1 ; // firse one is cmd;
 		if(numPar >= numParam)
 		{

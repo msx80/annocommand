@@ -22,7 +22,7 @@ public class Simple {
 	
 	public static void main(String[] args) {
 		
-		Command c = new Command(0, new Simple());
+		Command c = new Command(0, false, new Simple());
 		
 		c.execute("hello Johnny Cash");
 		c.execute("sum 4 5");
