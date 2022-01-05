@@ -381,8 +381,9 @@ public class Command<C> {
 		return this;
 	}
 
-	public void setCaseInsensitive(boolean caseInsensitive) {
+	public Command<C> setCaseInsensitive(boolean caseInsensitive) {
 		this.ignoreCase = caseInsensitive;
+		return this;
 	}
 	
 	
