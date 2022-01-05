@@ -1,5 +1,6 @@
 package org.github.msx80.annocommand;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
@@ -7,6 +8,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,12 +21,12 @@ import java.util.stream.Collectors;
  * For example it can turn "sum 5 4" into a call to a method "sum(int a, int b)"
  *
  */
-public class Command {
-
-	private static final Object[] EMPTY = new Object[0];
+public class Command<C> {
 
 	
 	 private static final Map<Class<?>, Class<?>> PRIMITIVES_TO_WRAPPERS = new HashMap<>();
+
+	private static final Collection<Class<? extends Annotation>> EMPTY_ANNOTATION_LIST = Arrays.asList();
 	 
 	 static {
 		 PRIMITIVES_TO_WRAPPERS.put(boolean.class, Boolean.class);
@@ -38,24 +40,43 @@ public class Command {
 		 PRIMITIVES_TO_WRAPPERS.put(void.class, Void.class);
 	 }
 	
-	List<CallSpec> calls = new ArrayList<>();
+	private final List<CallSpec> calls = new ArrayList<>();
+	private final Class<C> contextObjectClass;
+	private final boolean wantsContextObject;
+	private final Map<Class<?>, ClassParser<?, C>> classParsers = new HashMap<>();
 
+	private BiFunction<C, String, String> preparer = (context, text) -> text;
+	private BiFunction<C, String, String[]> tokenizer = (context, text) -> text.split(" +");
+	private AuthorizationLoader<C> authorizationLoader;
+	private BiFunction<C, String, Object> authorizationFallback;
+	private boolean ignoreCase = false;
 	
-	private Map<Class<?>, ClassParser<?>> classParsers = new HashMap<>();
-	private BiFunction<String, Object[], String> preparer = (text, context) -> text;
-	private BiFunction<String, Object[], String[]> tokenizer = (text, context) -> text.split(" +");
-	private int numContextParameters;
-	private boolean ignoreCase;
-
 	/**
 	 * Create a new Command to parse text commands, that will be sent the first matching method of the provided objects
-	 * @param numContextParameters number of extra parameters depending on context, handled outside of the string (like session or user identifiers)
-	 * @param objectsWithCommands the actual objects whose methods will be called
+	 * A context object is passed along to the methods and must appear as the first parameter.
+	 * @param objectsWithCommands the actual objects whose methods (tagged with @Cmd) will be called
 	 */
-	public Command(int numContextParameters, boolean ignoreCase, Object... objectsWithCommands) {
+	public static <E> Command<E> of(Class<E> contextObjectClass, Object... objectsWithCommands)
+	{
+		return new Command<E>(true, contextObjectClass, objectsWithCommands);
+	}
+	
+	/**
+	 * Create a new Command to parse text commands, that will be sent the first matching method of the provided objects
+	 * @param objectsWithCommands the actual objects whose methods (tagged with @Cmd) will be called
+	 */
+
+	public static Command<Void> of(Object... objectsWithCommands)
+	{
+		return new Command<Void>(false, Void.class, objectsWithCommands);
+	}
+	
+	private Command(boolean wantsContextObject, Class<C> contextObjectClass, Object... objectsWithCommands) {
 		
-		this.ignoreCase = ignoreCase;
-		this.numContextParameters = numContextParameters;
+
+		this.wantsContextObject = wantsContextObject;
+		this.contextObjectClass = contextObjectClass;
+		
 		for (Object object : objectsWithCommands) 
 		{
 			analyzeObject(object);
@@ -81,7 +102,7 @@ public class Command {
 	 * @param cls
 	 * @param cp
 	 */
-	public <C> void registerClassParser(Class<C> cls, ClassParser<C> cp)
+	public <V> void registerClassParser(Class<V> cls, ClassParser<V, C> cp)
 	{
 		classParsers.put(cls, cp);
 	}
@@ -91,7 +112,8 @@ public class Command {
 		for (Method m : ms) {
 			if(m.isAnnotationPresent(Cmd.class))
 			{
-				CallSpec c = new CallSpec(m, objectWithCommands, numContextParameters, ignoreCase);
+
+				CallSpec c = new CallSpec(m, objectWithCommands, wantsContextObject, contextObjectClass);
 				calls.add(c);
 			}
 		}
@@ -120,16 +142,16 @@ public class Command {
 	/**
 	 * Set a function that can process the string before being sent to execution.
 	 * For example you can use it to remove leading slashes, lowercase commands etc.
-	 * You can also return null, in this case the message will be discarded.
-	 * 
-	 * The function will receive the text to prepare and the context parameters, so it
+	 * You can also return null, in this case the message will be discarded and the execute()
+	 * method will return null.
+	 * The function will receive the context object along with the text to prepare, so it
 	 * can behave differently based on context.
 	 * 
 	 * @param preparer A new messagePreparer
 	 * @return this
 	 * 
 	 */
-	public Command setMessagePreparer(BiFunction<String, Object[], String> preparer) {
+	public Command<C> setMessagePreparer(BiFunction<C, String, String> preparer) {
 		this.preparer = preparer;
 		return this;
 	}
@@ -141,34 +163,54 @@ public class Command {
 	 * dividing the input string into pieces that will be matched to method parameters.
 	 * Default tokenizer divide by spaces ( text.split(" +"); ).
 	 * You can provide a custom tokenizer, for example to add quotes-delimited text or
-	 * such. Context parameters are passed to customize tokenization per context.
+	 * such. Context object is passed to customize tokenization per context.
 	 * @param tokenizer
 	 * @return this
 	 */
-	public Command setTokenizer(BiFunction<String, Object[], String[]> tokenizer) {
+	public Command<C> setTokenizer(BiFunction<C, String, String[]> tokenizer) {
 		this.tokenizer = tokenizer;
 		return this;
 	}
 
 	/**
-	 * Execute a command.
+	 * Execute a command without a context object.
+	 * @param m The command to execute
+	 * @return The return value of whichever method is found and called
+	 * @throws NoMatchingMethodException if no method could be found matching the text
+	 */
+	public Object execute(String m) throws NoMatchingMethodException
+	{
+		if(wantsContextObject) throw new AnnoCommandException("Calling execute without context object but wantsContextObject = true");
+		return execute(null, m);
+	}
+	/**
+	 * Execute a command, passing the context object to the called method (as first parameter)
 	 * @param m The text to parse and execute
-	 * @param context context parameters in number equal to the one configured at construction time
+	 * @param context context object as defined in the constructor
 	 * @return any returned object from the called method.
 	 * @throws NoMatchingMethodException if no method could be found matching the text
 	 */
-	public Object execute(String m, Object... context) throws NoMatchingMethodException
+	public Object execute(C context, String m) throws NoMatchingMethodException
 	{
-		if (context == null) context = EMPTY;
-		if(context.length != numContextParameters) throw new AnnoCommandException("Context parameters should be "+numContextParameters+", are "+context.length);
-		
-		String text = preparer.apply(m, context);
+			
+		String text = preparer.apply(context, m);
 		if(text == null) return null;
-		String[] tok = tokenizer.apply(text, context);
+		String[] tok = tokenizer.apply(context, text);
 		
 		for (CallSpec callSpec : calls) {
-			if(callSpec.match(tok))
+			if(callSpec.match(tok, ignoreCase))
 			{
+				if(authorizationLoader != null)
+				{
+					boolean checkOk = checkAuthorization(callSpec, context);
+					if(!checkOk)
+					{
+						if(authorizationFallback == null)
+							throw new AnnoCommandException("Unauthorized!");
+						else 
+							return authorizationFallback.apply(context, m);
+					}
+				}
 				// User u = db.parseUser(m.from(), m.regno());
 				return invoke(callSpec, context, tok);
 				
@@ -177,7 +219,27 @@ public class Command {
 		throw new NoMatchingMethodException(tok[0], "No method matching request.");
 		
 	}
+
+	private boolean checkAuthorization(CallSpec callSpec, C context) 
+	{
+		Collection<Class<? extends Annotation>> required = callSpec.requiredAnnotations;
+
+		if(required.isEmpty()) return true; // method doesn't require special authorization, return fast
+		
+		Collection<Class<? extends Annotation>> availableAnnotation = authorizationLoader.getAuths(context);
+		if(availableAnnotation==null) availableAnnotation = EMPTY_ANNOTATION_LIST;
+		
+		for (Class<? extends Annotation> a : required) {
+		
+			if(!availableAnnotation.contains(a))
+			{
+				return false;
+			}
 	
+		}
+		return true;
+	}
+
 	/**
 	 * List all available commands
 	 * @return a list of all commands with parameters.
@@ -207,33 +269,40 @@ public class Command {
 	}
 	
 	
-	private Object invoke(CallSpec call, Object[] context, String[] text)
+	private Object invoke(CallSpec call, C context, String[] text)
 	{
+		int realParamCount = call.numParam - (wantsContextObject ? 1:0);
 		text = Arrays.copyOfRange(text, 1, text.length);
-		if(text.length > call.numParam)
+		if(text.length > ( realParamCount ))
 		{
 			// there are more tokens than parameters. Join all extra into the last
-			text = String.join(" ", text).split(" ",call.numParam);
+			text = String.join(" ", text).split(" ",realParamCount);
 		}
-		
 		// now text is exacly the correct number
-		Object[] params = new Object[numContextParameters+call.numParam];
+		Object[] params = new Object[call.numParam];
 		
+		int startFrom;
 		// first pass context parameters
-		for (int i = 0; i < context.length; i++) {
-			params[i] = context[i];
+		if(wantsContextObject)
+		{
+			params[0] = context;
+			startFrom = 1;
+		}
+		else
+		{
+			startFrom = 0;
 		}
 		
-		for (int i = 0; i < call.numParam; i++) {
+		for (int i = startFrom; i < call.numParam; i++) {
 	
 			Object o;
 			try {
-				o = paramToObject(call.params[i], text[i], context);
+				o = paramToObject(call.params[i], text[i-startFrom], context);
 			} catch (Exception e) {
 				throw new AnnoCommandException("Error parsing parameter #"+i+" for "+call+": "+e.getMessage(), e); 
 			}
 
-			params[numContextParameters+i] = o;
+			params[i] = o;
 		}
 		
 		try {
@@ -255,7 +324,7 @@ public class Command {
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	private Object paramToObject(Parameter param, String valueToParse, Object[] context) {
+	private Object paramToObject(Parameter param, String valueToParse, C context) {
 		Object o;
 		Class<?> cls = param.getType();
 		
@@ -289,5 +358,32 @@ public class Command {
 		return o;
 	}
 
+	/**
+	 * Enable authorization checking. If enabled, commands can have extra Annotations that represents authorization capabilities, like @Admin or @Modify
+	 * To actually execute the method, the context object is queried to check what authorization capabilities are associated and if all of the required ones
+	 * are present. The provided AuthorizationLoader tells the system how to get the tokens of a given context.
+	 * @param authorizationLoader a loader to be used to get all authorizations associated to a context (for example an user)
+	 * @return this object to chain other method calls
+	 */
+	public Command<C> enableAuthorizationChecking(AuthorizationLoader<C> authorizationLoader) {
+		this.authorizationLoader = authorizationLoader;
+		return this;
+	}
+
+	/**
+	 * Normally, if authorization checking is enabled and the user doesn't have the authorization, an exception is thrown. With
+	 * this method you can set an alternative behaviour for this case.
+	 * @param authorizationFallback the function is called whenever a method cannot be executed for lack of authorizations.
+	 * @return this object to chain other method calls
+	 */
+	public Command<C> setAuthorizationFallback(BiFunction<C, String, Object> authorizationFallback) {
+		this.authorizationFallback = authorizationFallback;
+		return this;
+	}
+
+	public void setCaseInsensitive(boolean caseInsensitive) {
+		this.ignoreCase = caseInsensitive;
+	}
+	
 	
 }
