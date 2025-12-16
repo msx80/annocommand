@@ -1,4 +1,4 @@
-[![Release](https://jitpack.io/v/msx80/annocommand.svg)](https://jitpack.io/#msx80/annocommand)
+Command<Void> c = Command.of(this);Command<Void> c = Command.of(this);[![Release](https://jitpack.io/v/msx80/annocommand.svg)](https://jitpack.io/#msx80/annocommand)
 # annocommand
 Annotation based text command parser
 
@@ -30,8 +30,7 @@ public class Simple {
 	
 	public static void main(String[] args) {
 		
-		Command c = new Command(0, new Simple());
-		
+		Command<Void> c = Command.of(new Simple());
 		c.execute("hello Johnny");
 		c.execute("sum 4 5");
 		
@@ -52,14 +51,14 @@ SOMETEXT
 You can also specify some context object that you pass to `execute`, for example to handle users or sessions:
 
 ```java
-Command c = new Command(2, new MyCommands()); // 2 is the number of context parameters
+Command<User> c = Command.of(User.class, new MyCommands());
 ...
-@Cmd public void sayHello(User user, Session session, String someone)
+@Cmd public void sayHello(User user, String someone)
 {
 }
 ...
-c.execute("sayHello Foobar", myUser, mySession);
+c.execute(myUser, "sayHello Foobar");
 ```
 
 You can customize other stuff, like how to convert from String to your custom objects, how to tokenize the strings, etc.
-More advanced example is available [here](https://github.com/msx80/annocommand/tree/master/src/main/java/org/github/msx80/annocommand/example/account).
+More advanced examples can be found in the test cases [here](https://github.com/msx80/annocommand/tree/master/src/test/java/org/github/msx80/annocommand).
