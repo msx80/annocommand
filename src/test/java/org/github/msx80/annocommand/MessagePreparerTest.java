@@ -11,19 +11,31 @@ class MessagePreparerTest {
 		return "hello "+what;
 	}
 
-	@Cmd public String hello(String what, String what2)
+	@Cmd public String replaced()
 	{
-		return "hello2 "+what+" "+what2;
+		return "replaced";
 	}
 
+	private String prepare(Void param, String m)
+	{
+		m = m.trim();
+    	if(!m.startsWith("!"))
+		{
+			return null;
+		}
+		if(m.equals("!replaceme")) m = "!replaced";
+		// remove leading !
+		return m.substring(1);
+	}
+	    
 
 	@Test
 	void basicUsage() {
 		Command<Void> c = Command.of(this);
-		c.setTokenizer((v,s)-> s.split(","));
-		assertEquals(c.execute("hello,world"), "hello world");
-		assertEquals(c.execute("hello,cruel world"), "hello cruel world");
-		assertEquals(c.execute("hello,cruel,world"), "hello2 cruel world");
+		c.setMessagePreparer(this::prepare);
+		assertEquals(c.execute("!hello world"), "hello world");
+		assertNull(c.execute("hello world"));
+		assertEquals(c.execute("!replaceme"), "replaced");
 	
 	}
 
